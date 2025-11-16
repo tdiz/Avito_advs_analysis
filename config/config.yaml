@@ -1,0 +1,36 @@
+# Конфигурация бота для анализа объявлений Avito
+
+# Настройки парсера
+parser:
+  headless: true  # Запуск браузера в headless режиме
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  page_load_timeout: 10  # Таймаут загрузки страницы в секундах
+  request_delay: 3  # Задержка между запросами в секундах
+
+# Настройки базы данных
+database:
+  path: "data/avito_ads.db"
+  echo: false  # Вывод SQL запросов в консоль
+
+# Настройки логирования
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_to_file: true
+  log_dir: "logs"
+
+# Настройки по умолчанию для поиска
+search:
+  default_location: "rossiya"
+  default_max_pages: 1
+  max_retries: 3  # Количество повторных попыток при ошибке
+
+# Настройки анализа
+analytics:
+  top_keywords_count: 20
+  top_locations_count: 10
+  top_sellers_count: 10
+
+# Настройки экспорта
+export:
+  csv_encoding: "utf-8-sig"
+  json_indent: 2
