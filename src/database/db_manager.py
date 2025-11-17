@@ -43,7 +43,7 @@ class DatabaseManager:
         """Получение сессии базы данных"""
         return self.SessionLocal()
 
-    def save_advertisement(self, ad_data: Dict) -> Optional[Advertisement]:
+    def save_advertisement(self, ad_data: Dict) -> tuple:
         """
         Сохранение объявления в базу данных
 
@@ -51,7 +51,8 @@ class DatabaseManager:
             ad_data: Словарь с данными объявления
 
         Returns:
-            Объект Advertisement или None
+            Кортеж (объект Advertisement или None, is_new: bool)
+            is_new = True если создано новое, False если обновлено
         """
         session = self.get_session()
         try:
@@ -70,7 +71,7 @@ class DatabaseManager:
                 existing_ad.updated_at = datetime.now()
                 session.commit()
                 logger.info(f"Объявление {ad_data.get('id')} обновлено")
-                return existing_ad
+                return (existing_ad, False)  # False = обновлено
             else:
                 # Создаем новое объявление
                 ad = Advertisement(
@@ -91,20 +92,20 @@ class DatabaseManager:
                 session.add(ad)
                 session.commit()
                 logger.info(f"Объявление {ad_data.get('id')} сохранено")
-                return ad
+                return (ad, True)  # True = создано новое
 
         except IntegrityError as e:
             session.rollback()
             logger.error(f"Ошибка целостности данных: {e}")
-            return None
+            return (None, False)
         except Exception as e:
             session.rollback()
             logger.error(f"Ошибка при сохранении объявления: {e}")
-            return None
+            return (None, False)
         finally:
             session.close()
 
-    def save_advertisements_batch(self, ads_data: List[Dict]) -> int:
+    def save_advertisements_batch(self, ads_data: List[Dict]) -> dict:
         """
         Массовое сохранение объявлений
 
@@ -112,14 +113,28 @@ class DatabaseManager:
             ads_data: Список словарей с данными объявлений
 
         Returns:
-            Количество сохраненных объявлений
+            Словарь со статистикой: {'created': int, 'updated': int, 'failed': int}
         """
-        saved_count = 0
+        created_count = 0
+        updated_count = 0
+        failed_count = 0
+
         for ad_data in ads_data:
-            if self.save_advertisement(ad_data):
-                saved_count += 1
-        logger.info(f"Сохранено {saved_count} из {len(ads_data)} объявлений")
-        return saved_count
+            ad, is_new = self.save_advertisement(ad_data)
+            if ad:
+                if is_new:
+                    created_count += 1
+                else:
+                    updated_count += 1
+            else:
+                failed_count += 1
+
+        logger.info(f"Создано: {created_count}, обновлено: {updated_count}, ошибок: {failed_count}")
+        return {
+            'created': created_count,
+            'updated': updated_count,
+            'failed': failed_count
+        }
 
     def get_advertisement(self, ad_id: str) -> Optional[Advertisement]:
         """

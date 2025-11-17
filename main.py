@@ -168,22 +168,22 @@ def fetch_ads_from_db(db, args, logger):
 def save_ads_to_db(db, ads, args, logger):
     """Сохранение объявлений в базу данных"""
     if not ads:
-        return 0
+        return {'created': 0, 'updated': 0, 'failed': 0}
 
     logger.info("Сохранение объявлений в базу данных...")
 
     try:
-        saved_count = db.save_advertisements_batch(ads)
-        logger.info(f"Сохранено {saved_count} объявлений")
+        stats = db.save_advertisements_batch(ads)
+        logger.info(f"Создано: {stats['created']}, обновлено: {stats['updated']}, ошибок: {stats['failed']}")
 
         # Сохранение поискового запроса
         db.save_search_query(args.query, args.location, len(ads))
 
-        return saved_count
+        return stats
 
     except Exception as e:
         logger.error(f"Ошибка при сохранении в БД: {e}", exc_info=True)
-        return 0
+        return {'created': 0, 'updated': 0, 'failed': 0}
 
 
 def perform_analysis(ads, args, logger):
