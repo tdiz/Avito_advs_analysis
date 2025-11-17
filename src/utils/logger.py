@@ -42,7 +42,7 @@ def setup_logger(
 
     # Вывод в файл
     if log_to_file:
-        Path(log_dir).mkdir(exist_ok=True)
+        Path(log_dir).mkdir(parents=True, exist_ok=True)
         log_file = Path(log_dir) / f"{name}_{datetime.now().strftime('%Y%m%d')}.log"
 
         file_handler = logging.FileHandler(log_file, encoding='utf-8')

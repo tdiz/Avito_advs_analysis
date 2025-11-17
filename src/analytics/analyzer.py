@@ -3,6 +3,7 @@
 """
 import logging
 from typing import List, Dict, Optional
+from pathlib import Path
 import pandas as pd
 import numpy as np
 from collections import Counter
@@ -239,6 +240,9 @@ class AvitoAnalyzer:
             ads_data: Список объявлений
             file_path: Путь к файлу
         """
+        # Создаём директорию, если её нет
+        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+
         df = self.export_to_dataframe(ads_data)
         df.to_csv(file_path, index=False, encoding='utf-8-sig')
         logger.info(f"Данные экспортированы в {file_path}")
@@ -251,6 +255,9 @@ class AvitoAnalyzer:
             ads_data: Список объявлений
             file_path: Путь к файлу
         """
+        # Создаём директорию, если её нет
+        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(ads_data, f, ensure_ascii=False, indent=2)
         logger.info(f"Данные экспортированы в {file_path}")
@@ -289,6 +296,9 @@ class AvitoAnalyzer:
             report: Отчет
             file_path: Путь к файлу
         """
+        # Создаём директорию, если её нет
+        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(report, f, ensure_ascii=False, indent=2)
         logger.info(f"Отчет сохранен в {file_path}")

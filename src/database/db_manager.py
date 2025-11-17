@@ -4,6 +4,7 @@
 import logging
 from typing import List, Optional, Dict
 from datetime import datetime
+from pathlib import Path
 from sqlalchemy import create_engine, desc, and_, or_
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import IntegrityError
@@ -23,6 +24,11 @@ class DatabaseManager:
         Args:
             db_path: Путь к файлу базы данных
         """
+        # Создаём директорию для БД, если её нет
+        db_file = Path(db_path)
+        db_file.parent.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Директория для БД: {db_file.parent}")
+
         self.db_path = db_path
         self.engine = create_engine(f"sqlite:///{db_path}", echo=False)
         self.SessionLocal = sessionmaker(bind=self.engine)
