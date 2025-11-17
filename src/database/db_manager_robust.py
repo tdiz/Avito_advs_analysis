@@ -1,5 +1,6 @@
 """
-Менеджер базы данных для работы с объявлениями
+Улучшенный менеджер БД с комбинированной стратегией дедупликации
+ИСПОЛЬЗУЙТЕ ЭТОТ ФАЙЛ ЕСЛИ test_real_parsing.py ПОКАЗАЛ ЧТО URL ТОЖЕ ДИНАМИЧЕСКИЕ!
 """
 import logging
 from typing import List, Optional, Dict
@@ -14,17 +15,10 @@ from .models import Base, Advertisement, SearchQuery
 logger = logging.getLogger(__name__)
 
 
-class DatabaseManager:
-    """Класс для управления базой данных"""
+class DatabaseManagerRobust:
+    """Менеджер БД с комбинированной дедупликацией"""
 
     def __init__(self, db_path: str = "data/avito_ads.db"):
-        """
-        Инициализация менеджера БД
-
-        Args:
-            db_path: Путь к файлу базы данных
-        """
-        # Создаём директорию для БД, если её нет
         db_file = Path(db_path)
         db_file.parent.mkdir(parents=True, exist_ok=True)
         logger.info(f"Директория для БД: {db_file.parent}")
@@ -35,45 +29,77 @@ class DatabaseManager:
         self._create_tables()
 
     def _create_tables(self):
-        """Создание таблиц в базе данных"""
         Base.metadata.create_all(self.engine)
         logger.info("Таблицы базы данных созданы/проверены")
 
     def get_session(self) -> Session:
-        """Получение сессии базы данных"""
         return self.SessionLocal()
+
+    def _find_existing_ad(self, session: Session, ad_data: Dict) -> Optional[Advertisement]:
+        """
+        Комбинированный поиск существующего объявления:
+        1. По URL (если есть и стабильный)
+        2. По содержимому (title + price + seller + address)
+        """
+        url = ad_data.get("url")
+
+        # Попытка 1: Поиск по URL
+        if url:
+            existing = session.query(Advertisement).filter_by(url=url).first()
+            if existing:
+                logger.debug(f"Найдено по URL: {url[:50]}...")
+                return existing
+
+        # Попытка 2: Поиск по содержимому
+        title = ad_data.get("title")
+        price = ad_data.get("price")
+        seller = ad_data.get("seller")
+        address = ad_data.get("address")
+
+        if title:  # Title обязателен
+            filters = [Advertisement.title == title]
+
+            # Добавляем дополнительные условия если есть данные
+            if price is not None:
+                filters.append(Advertisement.price == price)
+            if seller:
+                filters.append(Advertisement.seller == seller)
+            if address:
+                filters.append(Advertisement.address == address)
+
+            existing = session.query(Advertisement).filter(and_(*filters)).first()
+            if existing:
+                logger.debug(f"Найдено по содержимому: {title[:50]}...")
+                return existing
+
+        return None
 
     def save_advertisement(self, ad_data: Dict) -> tuple:
         """
-        Сохранение объявления в базу данных
-
-        Args:
-            ad_data: Словарь с данными объявления
+        Сохранение с комбинированной дедупликацией
 
         Returns:
-            Кортеж (объект Advertisement или None, is_new: bool)
-            is_new = True если создано новое, False если обновлено
+            (Advertisement | None, is_new: bool)
         """
         session = self.get_session()
         try:
-            # Проверяем, существует ли уже объявление по URL (стабильный идентификатор)
-            existing_ad = session.query(Advertisement).filter_by(
-                url=ad_data.get("url")
-            ).first()
+            # Ищем существующее объявление
+            existing_ad = self._find_existing_ad(session, ad_data)
 
             if existing_ad:
-                # Обновляем существующее объявление
+                # Обновляем существующее
                 for key, value in ad_data.items():
                     if key == "id":
                         continue
                     if hasattr(existing_ad, key):
                         setattr(existing_ad, key, value)
+
                 existing_ad.updated_at = datetime.now()
                 session.commit()
-                logger.debug(f"Объявление обновлено (URL: {ad_data.get('url')[:50]}...)")
-                return (existing_ad, False)  # False = обновлено
+                logger.debug(f"Обновлено: {ad_data.get('title', '')[:50]}...")
+                return (existing_ad, False)
             else:
-                # Создаем новое объявление
+                # Создаём новое
                 ad = Advertisement(
                     ad_id=ad_data.get("id"),
                     title=ad_data.get("title"),
@@ -91,30 +117,22 @@ class DatabaseManager:
                 )
                 session.add(ad)
                 session.commit()
-                logger.debug(f"Новое объявление создано: {ad_data.get('title')[:50]}...")
-                return (ad, True)  # True = создано новое
+                logger.debug(f"Создано: {ad_data.get('title', '')[:50]}...")
+                return (ad, True)
 
         except IntegrityError as e:
             session.rollback()
-            logger.error(f"Ошибка целостности данных: {e}")
+            logger.error(f"Ошибка целостности: {e}")
             return (None, False)
         except Exception as e:
             session.rollback()
-            logger.error(f"Ошибка при сохранении объявления: {e}")
+            logger.error(f"Ошибка при сохранении: {e}")
             return (None, False)
         finally:
             session.close()
 
     def save_advertisements_batch(self, ads_data: List[Dict]) -> dict:
-        """
-        Массовое сохранение объявлений
-
-        Args:
-            ads_data: Список словарей с данными объявлений
-
-        Returns:
-            Словарь со статистикой: {'created': int, 'updated': int, 'failed': int}
-        """
+        """Массовое сохранение"""
         created_count = 0
         updated_count = 0
         failed_count = 0
@@ -136,20 +154,11 @@ class DatabaseManager:
             'failed': failed_count
         }
 
+    # Остальные методы - копируем из db_manager.py
     def get_advertisement(self, ad_id: str) -> Optional[Advertisement]:
-        """
-        Получение объявления по ID
-
-        Args:
-            ad_id: ID объявления
-
-        Returns:
-            Объект Advertisement или None
-        """
         session = self.get_session()
         try:
-            ad = session.query(Advertisement).filter_by(ad_id=ad_id).first()
-            return ad
+            return session.query(Advertisement).filter_by(ad_id=ad_id).first()
         finally:
             session.close()
 
@@ -159,31 +168,15 @@ class DatabaseManager:
         offset: int = 0,
         order_by: str = "parsed_at"
     ) -> List[Advertisement]:
-        """
-        Получение всех объявлений
-
-        Args:
-            limit: Максимальное количество объявлений
-            offset: Смещение
-            order_by: Поле для сортировки
-
-        Returns:
-            Список объявлений
-        """
         session = self.get_session()
         try:
             query = session.query(Advertisement)
-
-            # Сортировка
             if hasattr(Advertisement, order_by):
                 query = query.order_by(desc(getattr(Advertisement, order_by)))
-
-            # Пагинация
             if limit:
                 query = query.limit(limit)
             if offset:
                 query = query.offset(offset)
-
             return query.all()
         finally:
             session.close()
@@ -195,18 +188,6 @@ class DatabaseManager:
         max_price: Optional[float] = None,
         address: Optional[str] = None
     ) -> List[Advertisement]:
-        """
-        Поиск объявлений по критериям
-
-        Args:
-            query: Поисковый запрос (по заголовку/описанию)
-            min_price: Минимальная цена
-            max_price: Максимальная цена
-            address: Адрес
-
-        Returns:
-            Список найденных объявлений
-        """
         session = self.get_session()
         try:
             filters = [Advertisement.is_active == True]
@@ -220,27 +201,16 @@ class DatabaseManager:
 
             if min_price is not None:
                 filters.append(Advertisement.price >= min_price)
-
             if max_price is not None:
                 filters.append(Advertisement.price <= max_price)
-
             if address:
                 filters.append(Advertisement.address.ilike(f"%{address}%"))
 
-            ads = session.query(Advertisement).filter(and_(*filters)).all()
-            return ads
+            return session.query(Advertisement).filter(and_(*filters)).all()
         finally:
             session.close()
 
     def save_search_query(self, query: str, location: str, ads_found: int):
-        """
-        Сохранение поискового запроса в историю
-
-        Args:
-            query: Поисковый запрос
-            location: Локация
-            ads_found: Количество найденных объявлений
-        """
         session = self.get_session()
         try:
             search = SearchQuery(
@@ -258,19 +228,12 @@ class DatabaseManager:
             session.close()
 
     def get_statistics(self) -> Dict:
-        """
-        Получение статистики по базе данных
-
-        Returns:
-            Словарь со статистикой
-        """
         session = self.get_session()
         try:
             total_ads = session.query(Advertisement).count()
             active_ads = session.query(Advertisement).filter_by(is_active=True).count()
             total_queries = session.query(SearchQuery).count()
 
-            # Средняя цена
             avg_price = session.query(Advertisement).filter(
                 Advertisement.price.isnot(None)
             ).with_entities(Advertisement.price).all()
@@ -286,13 +249,4 @@ class DatabaseManager:
             session.close()
 
     def export_to_dict(self, ads: List[Advertisement]) -> List[Dict]:
-        """
-        Экспорт объявлений в список словарей
-
-        Args:
-            ads: Список объявлений
-
-        Returns:
-            Список словарей
-        """
         return [ad.to_dict() for ad in ads]

@@ -18,10 +18,10 @@ class Advertisement(Base):
     __tablename__ = "advertisements"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    ad_id = Column(String(50), unique=True, index=True, nullable=False)
+    ad_id = Column(String(255), nullable=True, index=True)  # Может быть динамическим
     title = Column(String(500), nullable=False)
     price = Column(Float, nullable=True)
-    url = Column(Text, nullable=False)
+    url = Column(String(1000), unique=True, nullable=False, index=True)  # URL - стабильный идентификатор
     description = Column(Text, nullable=True)
     full_description = Column(Text, nullable=True)
     address = Column(String(500), nullable=True)
