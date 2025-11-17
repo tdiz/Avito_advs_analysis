@@ -13,7 +13,6 @@ numpy>=1.24.0
 
 # Database
 sqlalchemy>=2.0.0
-sqlite3
 
 # Configuration
 python-dotenv>=1.0.0
@@ -33,7 +32,6 @@ pydantic>=2.5.0
 
 # Async support
 aiohttp>=3.9.0
-asyncio
 
 # Utils
 python-dateutil>=2.8.2
