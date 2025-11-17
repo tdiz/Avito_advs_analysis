@@ -43,31 +43,68 @@ class AvitoParser:
         self.driver = None
 
     def _setup_driver(self):
-        """Настройка Selenium WebDriver"""
+        """Настройка Selenium WebDriver с максимальной маскировкой"""
         chrome_options = Options()
 
         if self.headless:
-            chrome_options.add_argument("--headless")
+            chrome_options.add_argument("--headless=new")  # Новый headless режим
 
+        # User-Agent
         chrome_options.add_argument(f"user-agent={self.user_agent}")
+
+        # Базовые антидетект параметры
         chrome_options.add_argument("--disable-blink-features=AutomationControlled")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1920,1080")
+        chrome_options.add_argument("--start-maximized")
+
+        # Дополнительные флаги для маскировки
+        chrome_options.add_argument("--disable-web-security")
+        chrome_options.add_argument("--allow-running-insecure-content")
+        chrome_options.add_argument("--disable-features=IsolateOrigins,site-per-process")
+        chrome_options.add_argument("--disable-site-isolation-trials")
 
         # Отключаем обнаружение автоматизации
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
         chrome_options.add_experimental_option('useAutomationExtension', False)
+
+        # Preferences для более реалистичного поведения
+        prefs = {
+            "profile.default_content_setting_values.notifications": 2,  # Блокируем уведомления
+            "credentials_enable_service": False,
+            "profile.password_manager_enabled": False
+        }
+        chrome_options.add_experimental_option("prefs", prefs)
 
         service = Service(ChromeDriverManager().install())
         self.driver = webdriver.Chrome(service=service, options=chrome_options)
 
-        # Убираем признак WebDriver
-        self.driver.execute_script(
-            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-        )
+        # Продвинутая маскировка через JS
+        self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+            "source": """
+                // Убираем webdriver флаг
+                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
 
-        logger.info("WebDriver настроен успешно")
+                // Подделываем параметры браузера
+                Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+                Object.defineProperty(navigator, 'languages', {get: () => ['ru-RU', 'ru', 'en-US', 'en']});
+
+                // Подделываем Chrome runtime
+                window.chrome = {runtime: {}};
+
+                // Маскируем permissions
+                const originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (parameters) => (
+                    parameters.name === 'notifications' ?
+                        Promise.resolve({state: Notification.permission}) :
+                        originalQuery(parameters)
+                );
+            """
+        })
+
+        logger.info("WebDriver настроен в стелс-режиме")
 
     def search_ads(
         self,
@@ -142,13 +179,31 @@ class AvitoParser:
         try:
             # Проверка на блокировку/капчу
             page_source = self.driver.page_source
-            if "Доступ ограничен" in page_source or "проблема с IP" in page_source or "captcha" in page_source.lower():
+
+            # DEBUG: Сохраняем HTML и скриншот для анализа
+            if "Доступ ограничен" in page_source or "проблема с IP" in page_source:
+                import os
+                from pathlib import Path
+                debug_dir = Path("debug")
+                debug_dir.mkdir(exist_ok=True)
+
+                # Сохраняем HTML
+                with open(debug_dir / "page_blocked.html", "w", encoding="utf-8") as f:
+                    f.write(page_source)
+
+                # Сохраняем скриншот
+                self.driver.save_screenshot(str(debug_dir / "page_blocked.png"))
+
                 logger.error("❌ ОБНАРУЖЕНА БЛОКИРОВКА AVITO!")
+                logger.error(f"Debug файлы сохранены в: {debug_dir.absolute()}")
+                logger.error("  - page_blocked.html (HTML страницы)")
+                logger.error("  - page_blocked.png (скриншот)")
+                logger.error("")
                 logger.error("Рекомендации:")
-                logger.error("  1. Подождите 10-15 минут")
-                logger.error("  2. Перезагрузите роутер для получения нового IP")
-                logger.error("  3. Используйте VPN/прокси")
-                logger.error("  4. Увеличьте задержки между запросами")
+                logger.error("  1. Откройте файлы выше чтобы увидеть что видит бот")
+                logger.error("  2. Подождите 10-15 минут")
+                logger.error("  3. Перезагрузите роутер для получения нового IP")
+                logger.error("  4. Используйте VPN/прокси")
                 raise ConnectionError("IP заблокирован Avito")
 
             # Ждем загрузки элементов
