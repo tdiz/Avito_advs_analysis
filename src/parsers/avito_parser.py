@@ -8,6 +8,7 @@ from typing import List, Dict, Optional
 from datetime import datetime
 from bs4 import BeautifulSoup
 import requests
+from tqdm import tqdm
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -130,39 +131,49 @@ class AvitoParser:
 
         all_ads = []
 
-        for page in range(1, max_pages + 1):
-            logger.info(f"Парсинг страницы {page} из {max_pages}")
+        # Прогресс-бар для страниц
+        with tqdm(total=max_pages, desc="Парсинг страниц", unit="стр") as pbar:
+            for page in range(1, max_pages + 1):
+                pbar.set_description(f"Страница {page}/{max_pages}")
 
-            # Формируем URL для поиска
-            search_url = f"{self.BASE_URL}/{location}?q={query}&p={page}"
-            logger.info(f"Парсинг URL: {search_url}")
+                # Формируем URL для поиска
+                search_url = f"{self.BASE_URL}/{location}?q={query}&p={page}"
+                logger.info(f"Парсинг URL: {search_url}")
 
-            try:
-                self.driver.get(search_url)
-                # Случайная задержка 3-6 секунд (имитация человека)
-                time.sleep(random.uniform(3, 6))
-
-                # Парсим объявления на странице
-                ads = self._parse_page()
-                all_ads.extend(ads)
-
-                logger.info(f"Найдено {len(ads)} объявлений на странице {page}")
-
-                # Проверяем лимит
-                if limit and len(all_ads) >= limit:
-                    logger.info(f"Достигнут лимит: {limit} объявлений")
-                    all_ads = all_ads[:limit]  # Обрезаем до нужного количества
-                    break
-
-                # Случайная пауза между страницами 5-10 секунд
-                if page < max_pages:
-                    delay = random.uniform(5, 10)
-                    logger.info(f"Пауза {delay:.1f} сек перед следующей страницей...")
+                try:
+                    self.driver.get(search_url)
+                    # Случайная задержка 3-6 секунд (имитация человека)
+                    delay = random.uniform(3, 6)
+                    pbar.set_postfix({"загрузка": f"{delay:.1f}с"})
                     time.sleep(delay)
 
-            except Exception as e:
-                logger.error(f"Ошибка при парсинге страницы {page}: {e}")
-                continue
+                    # Парсим объявления на странице
+                    ads = self._parse_page()
+                    all_ads.extend(ads)
+
+                    pbar.set_postfix({"найдено": len(ads), "всего": len(all_ads)})
+                    logger.info(f"Найдено {len(ads)} объявлений на странице {page}")
+
+                    # Проверяем лимит
+                    if limit and len(all_ads) >= limit:
+                        logger.info(f"Достигнут лимит: {limit} объявлений")
+                        all_ads = all_ads[:limit]  # Обрезаем до нужного количества
+                        pbar.update(max_pages - page + 1)  # Завершаем прогресс-бар
+                        break
+
+                    pbar.update(1)
+
+                    # Случайная пауза между страницами 5-10 секунд
+                    if page < max_pages:
+                        delay = random.uniform(5, 10)
+                        pbar.set_postfix({"пауза": f"{delay:.1f}с"})
+                        logger.info(f"Пауза {delay:.1f} сек перед следующей страницей...")
+                        time.sleep(delay)
+
+                except Exception as e:
+                    logger.error(f"Ошибка при парсинге страницы {page}: {e}")
+                    pbar.update(1)
+                    continue
 
         logger.info(f"Всего найдено {len(all_ads)} объявлений")
         return all_ads
