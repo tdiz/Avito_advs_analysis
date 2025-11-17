@@ -69,18 +69,32 @@ ChromeDriver устанавливается автоматически при п
 
 ## Использование
 
+### Способы запуска
+
+```bash
+# Рекомендуемый способ (через run.py)
+python run.py --query "ноутбук" --location "moskva" --pages 2
+
+# Или напрямую (требуется правильный PYTHONPATH)
+python main.py --query "ноутбук" --location "moskva" --pages 2
+
+# Или установить как пакет и использовать команду
+pip install -e .
+avito-bot --query "ноутбук" --location "moskva" --pages 2
+```
+
 ### Базовый запуск
 
 Поиск объявлений с ноутбуками в Москве:
 
 ```bash
-python main.py --query "ноутбук" --location "moskva" --pages 2
+python run.py --query "ноутбук" --location "moskva" --pages 2
 ```
 
 ### Расширенное использование
 
 ```bash
-python main.py \
+python run.py \
   --query "ноутбук" \
   --location "moskva" \
   --pages 3 \
@@ -91,13 +105,28 @@ python main.py \
   --report data/report.json
 ```
 
+### Работа с данными из БД (без парсинга)
+
+Анализировать уже собранные данные без повторного парсинга:
+
+```bash
+# Анализ данных из БД
+python run.py --query "ноутбук" --from-db --analyze
+
+# Экспорт из БД с фильтрацией по цене
+python run.py --query "ноутбук" --from-db --min-price 30000 --max-price 100000 --export-csv filtered.csv
+```
+
 ### Параметры командной строки
 
 | Параметр | Описание | Обязательный | Значение по умолчанию |
 |----------|----------|--------------|----------------------|
-| `--query` | Поисковый запрос | Да | - |
+| `--query` | Поисковый запрос | Да* | - |
 | `--location` | Локация (moskva, sankt-peterburg, rossiya) | Нет | rossiya |
 | `--pages` | Количество страниц для парсинга | Нет | 1 |
+| `--from-db` | Использовать данные из БД (без парсинга) | Нет | False |
+| `--min-price` | Минимальная цена для фильтрации (только с --from-db) | Нет | - |
+| `--max-price` | Максимальная цена для фильтрации (только с --from-db) | Нет | - |
 | `--headless` | Запуск браузера в headless режиме | Нет | False |
 | `--analyze` | Выполнить анализ данных | Нет | False |
 | `--export-csv` | Путь к CSV файлу для экспорта | Нет | - |
@@ -110,19 +139,19 @@ python main.py \
 ### Пример 1: Простой парсинг
 
 ```bash
-python main.py --query "iPhone 15" --location "moskva"
+python run.py --query "iPhone 15" --location "moskva"
 ```
 
 ### Пример 2: Парсинг с анализом
 
 ```bash
-python main.py --query "квартира" --location "sankt-peterburg" --pages 5 --analyze
+python run.py --query "квартира" --location "sankt-peterburg" --pages 5 --analyze
 ```
 
 ### Пример 3: Парсинг с экспортом
 
 ```bash
-python main.py \
+python run.py \
   --query "автомобиль Toyota" \
   --location "rossiya" \
   --pages 3 \
@@ -133,13 +162,34 @@ python main.py \
 ### Пример 4: Полный анализ с отчетом
 
 ```bash
-python main.py \
+python run.py \
   --query "MacBook" \
   --location "moskva" \
   --pages 5 \
   --headless \
   --analyze \
   --report analysis_report.json
+```
+
+### Пример 5: Анализ данных из БД (без парсинга)
+
+```bash
+# Сначала собираем данные
+python run.py --query "ноутбук" --location "moskva" --pages 3
+
+# Потом анализируем без повторного парсинга
+python run.py --query "ноутбук" --from-db --analyze --report laptop_report.json
+```
+
+### Пример 6: Фильтрация и экспорт из БД
+
+```bash
+# Экспорт только дорогих ноутбуков из БД
+python run.py --query "ноутбук" --from-db \
+  --min-price 100000 \
+  --max-price 200000 \
+  --export-csv expensive_laptops.csv \
+  --analyze
 ```
 
 ## Возможные локации
