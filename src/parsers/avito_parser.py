@@ -95,6 +95,7 @@ class AvitoParser:
 
             # Формируем URL для поиска
             search_url = f"{self.BASE_URL}/{location}?q={query}&p={page}"
+            logger.info(f"Парсинг URL: {search_url}")
 
             try:
                 self.driver.get(search_url)
