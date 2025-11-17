@@ -9,14 +9,11 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 import requests
 from tqdm import tqdm
-from selenium import webdriver
+import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.service import Service
 
 
 logger = logging.getLogger(__name__)
@@ -44,68 +41,31 @@ class AvitoParser:
         self.driver = None
 
     def _setup_driver(self):
-        """Настройка Selenium WebDriver с максимальной маскировкой"""
-        chrome_options = Options()
+        """Настройка undetected-chromedriver (обходит детектирование Avito)"""
+        options = uc.ChromeOptions()
 
-        if self.headless:
-            chrome_options.add_argument("--headless=new")  # Новый headless режим
+        # Базовые параметры
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--window-size=1920,1080")
 
-        # User-Agent
-        chrome_options.add_argument(f"user-agent={self.user_agent}")
-
-        # Базовые антидетект параметры
-        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--window-size=1920,1080")
-        chrome_options.add_argument("--start-maximized")
-
-        # Дополнительные флаги для маскировки
-        chrome_options.add_argument("--disable-web-security")
-        chrome_options.add_argument("--allow-running-insecure-content")
-        chrome_options.add_argument("--disable-features=IsolateOrigins,site-per-process")
-        chrome_options.add_argument("--disable-site-isolation-trials")
-
-        # Отключаем обнаружение автоматизации
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
-        chrome_options.add_experimental_option('useAutomationExtension', False)
-
-        # Preferences для более реалистичного поведения
+        # Preferences
         prefs = {
-            "profile.default_content_setting_values.notifications": 2,  # Блокируем уведомления
+            "profile.default_content_setting_values.notifications": 2,
             "credentials_enable_service": False,
             "profile.password_manager_enabled": False
         }
-        chrome_options.add_experimental_option("prefs", prefs)
+        options.add_experimental_option("prefs", prefs)
 
-        service = Service(ChromeDriverManager().install())
-        self.driver = webdriver.Chrome(service=service, options=chrome_options)
+        # Создаём undetected Chrome driver
+        self.driver = uc.Chrome(
+            options=options,
+            headless=self.headless,
+            use_subprocess=True,
+            version_main=None  # Автоопределение версии Chrome
+        )
 
-        # Продвинутая маскировка через JS
-        self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-            "source": """
-                // Убираем webdriver флаг
-                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-
-                // Подделываем параметры браузера
-                Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
-                Object.defineProperty(navigator, 'languages', {get: () => ['ru-RU', 'ru', 'en-US', 'en']});
-
-                // Подделываем Chrome runtime
-                window.chrome = {runtime: {}};
-
-                // Маскируем permissions
-                const originalQuery = window.navigator.permissions.query;
-                window.navigator.permissions.query = (parameters) => (
-                    parameters.name === 'notifications' ?
-                        Promise.resolve({state: Notification.permission}) :
-                        originalQuery(parameters)
-                );
-            """
-        })
-
-        logger.info("WebDriver настроен в стелс-режиме")
+        logger.info("Undetected ChromeDriver настроен (обходит защиту Avito)")
 
     def search_ads(
         self,

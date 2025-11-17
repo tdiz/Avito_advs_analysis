@@ -6,6 +6,7 @@ lxml>=4.9.0
 
 # Browser automation
 webdriver-manager>=4.0.0
+undetected-chromedriver>=3.5.0
 
 # Data processing
 pandas>=2.1.0
