@@ -2,6 +2,7 @@
 Модуль для парсинга объявлений с Avito
 """
 import time
+import random
 import logging
 from typing import List, Dict, Optional
 from datetime import datetime
@@ -101,7 +102,8 @@ class AvitoParser:
 
             try:
                 self.driver.get(search_url)
-                time.sleep(2)  # Ждем загрузки страницы
+                # Случайная задержка 3-6 секунд (имитация человека)
+                time.sleep(random.uniform(3, 6))
 
                 # Парсим объявления на странице
                 ads = self._parse_page()
@@ -115,8 +117,11 @@ class AvitoParser:
                     all_ads = all_ads[:limit]  # Обрезаем до нужного количества
                     break
 
-                # Пауза между запросами
-                time.sleep(3)
+                # Случайная пауза между страницами 5-10 секунд
+                if page < max_pages:
+                    delay = random.uniform(5, 10)
+                    logger.info(f"Пауза {delay:.1f} сек перед следующей страницей...")
+                    time.sleep(delay)
 
             except Exception as e:
                 logger.error(f"Ошибка при парсинге страницы {page}: {e}")
@@ -135,13 +140,30 @@ class AvitoParser:
         ads = []
 
         try:
+            # Проверка на блокировку/капчу
+            page_source = self.driver.page_source
+            if "Доступ ограничен" in page_source or "проблема с IP" in page_source or "captcha" in page_source.lower():
+                logger.error("❌ ОБНАРУЖЕНА БЛОКИРОВКА AVITO!")
+                logger.error("Рекомендации:")
+                logger.error("  1. Подождите 10-15 минут")
+                logger.error("  2. Перезагрузите роутер для получения нового IP")
+                logger.error("  3. Используйте VPN/прокси")
+                logger.error("  4. Увеличьте задержки между запросами")
+                raise ConnectionError("IP заблокирован Avito")
+
             # Ждем загрузки элементов
             WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "[data-marker='item']"))
             )
 
+            # Имитация человека: плавный скроллинг страницы
+            scroll_pause = random.uniform(0.5, 1.5)
+            for i in range(3):  # 3 скролла вниз
+                self.driver.execute_script(f"window.scrollBy(0, {random.randint(300, 500)});")
+                time.sleep(scroll_pause)
+
             # Получаем HTML страницы
-            soup = BeautifulSoup(self.driver.page_source, 'lxml')
+            soup = BeautifulSoup(page_source, 'lxml')
 
             # Находим все объявления
             ad_items = soup.find_all(attrs={"data-marker": "item"})
