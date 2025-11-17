@@ -307,6 +307,11 @@ def main():
             logger.info(f"Локация: {args.location}")
             logger.info(f"Количество страниц: {args.pages}")
 
+            # Показываем URL для ручной проверки
+            base_url = "https://www.avito.ru"
+            search_url = f"{base_url}/{args.location}?q={args.query}&p=1"
+            logger.info(f"URL для проверки: {search_url}")
+
             ads = fetch_ads_from_parser(args, logger)
 
             # Сохранение в БД
