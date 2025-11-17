@@ -209,7 +209,7 @@ class AvitoParser:
                 "address": address,
                 "published_date": published_date,
                 "seller": seller,
-                "parsed_at": datetime.now().isoformat()
+                "parsed_at": datetime.now()
             }
 
             return ad_data
