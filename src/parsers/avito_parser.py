@@ -72,7 +72,8 @@ class AvitoParser:
         self,
         query: str,
         location: str = "rossiya",
-        max_pages: int = 1
+        max_pages: int = 1,
+        limit: Optional[int] = None
     ) -> List[Dict]:
         """
         Поиск объявлений по запросу
@@ -81,6 +82,7 @@ class AvitoParser:
             query: Поисковый запрос
             location: Локация (например, 'moskva', 'sankt-peterburg')
             max_pages: Максимальное количество страниц для парсинга
+            limit: Максимальное количество объявлений (останавливается после достижения)
 
         Returns:
             Список словарей с информацией об объявлениях
@@ -106,6 +108,12 @@ class AvitoParser:
                 all_ads.extend(ads)
 
                 logger.info(f"Найдено {len(ads)} объявлений на странице {page}")
+
+                # Проверяем лимит
+                if limit and len(all_ads) >= limit:
+                    logger.info(f"Достигнут лимит: {limit} объявлений")
+                    all_ads = all_ads[:limit]  # Обрезаем до нужного количества
+                    break
 
                 # Пауза между запросами
                 time.sleep(3)

@@ -90,6 +90,11 @@ def parse_arguments():
         type=float,
         help='Максимальная цена для фильтрации из БД'
     )
+    parser.add_argument(
+        '--limit',
+        type=int,
+        help='Максимальное количество объявлений для парсинга (например, 10)'
+    )
 
     return parser.parse_args()
 
@@ -108,7 +113,8 @@ def fetch_ads_from_parser(args, logger):
             ads = avito.search_ads(
                 query=args.query,
                 location=args.location,
-                max_pages=args.pages
+                max_pages=args.pages,
+                limit=args.limit
             )
 
             if not ads:
