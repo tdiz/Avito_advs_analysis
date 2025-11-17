@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Детальная инспекция БД - показываем ВСЕ поля включая полные ad_id
 """
 import sys
 from pathlib import Path
+
+# Исправление кодировки для PowerShell
+if sys.platform == 'win32':
+    import codecs
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+
 sys.path.insert(0, str(Path(__file__).parent))
 
 from src.database.db_manager import DatabaseManager
